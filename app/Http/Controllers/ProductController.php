@@ -5,6 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\ProductsExport;
+
 
 class ProductController extends Controller
 {
@@ -14,7 +18,7 @@ class ProductController extends Controller
     public function index()
     {
         return inertia('products/index', [
-            'products' => Product::latest()->paginate(10)
+            'products' => Product::orderBy('id','asc')->get()
         ]);
     }
 
@@ -78,5 +82,36 @@ class ProductController extends Controller
         $product->delete();
 
         return redirect()->route('products.index');
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function generateReport()
+    {
+        $product_id = request()->id;
+        $data = [
+            //'title' => 'Listado de Productos',
+            'date' => date('d/m/Y'),
+            //'products' => $products,
+        ];
+
+        if ( $product_id ) {
+            $product = Product::find($product_id);
+            $data['title'] = 'Producto '.$product->name;
+            $data['product'] = [$product];
+            $pdf = Pdf::loadView( 'product', ['data' => $data])->setPaper('a4', 'portrait');
+            return $pdf->stream( 'product.pdf' );
+        }
+        //en caso de que no se pase id, se listan todos
+        $products = Product::select( 'id', 'name', 'description' )->get();
+        $data['title'] = 'Listado de Productos';
+        $data['products'] = $products;
+        $pdf = Pdf::loadView( 'products', ['data' => $data])->setPaper('a4', 'portrait');
+        return $pdf->stream( 'products.pdf' );
+    }
+    public function export() 
+    {
+        return Excel::download(new ProductsExport, 'products.xlsx');
     }
 }
